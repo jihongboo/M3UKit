@@ -93,6 +93,10 @@ DocC sources are included at:
 
 - `Sources/M3UKit/M3UKit.docc`
 
+Published documentation:
+
+- https://jihongboo.github.io/M3UKit/documentation/m3ukit/
+
 To generate documentation (requires a local DocC-capable toolchain):
 
 ```bash
