@@ -16,6 +16,7 @@
 - Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`, `#KODIPROP`)
 - `#EXTENC` support
 - `#EXT-X-*` key-value extraction for HLS tags
+- Enum-based IPTV key access (`playlist[iptv:]`, `item[iptv:]`) to avoid raw string keys
 - Input support from `String`, `Data`, and URL (`http/https` + `file://`)
 - Full Apple platform support via Swift Package Manager
 
@@ -63,6 +64,18 @@ Parse from URL:
 let playlistFromURL = try await parser.parse(
     url: URL(string: "https://example.com/live.m3u8")!
 )
+```
+
+Typed IPTV access (no hard-coded string keys):
+
+```swift
+let playlist = try parser.parse(source)
+let item = playlist.items[0]
+
+print(playlist[iptv: .xTvgURL] ?? "")
+print(item[iptv: .tvgID] ?? "")
+print(item.groupTitle ?? "")
+print(item.directive(named: .extvlcopt)?.attributes["http-user-agent"] ?? "")
 ```
 
 ## Documentation

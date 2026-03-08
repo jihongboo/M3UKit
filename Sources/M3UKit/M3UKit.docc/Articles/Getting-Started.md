@@ -44,3 +44,4 @@ let strictPlaylist = try parser.parse(sourceText, options: .strict)
 - `#EXTINF` duration, title, and quoted/unquoted attributes (duration can be omitted)
 - Additional directives attached to the following item (including IPTV tags such as `#KODIPROP`)
 - `#EXT-X-*` directives with extracted key-value attributes
+- Enum-based IPTV access via `playlist[iptv:]`, `item[iptv:]`, and `directive(named:)`

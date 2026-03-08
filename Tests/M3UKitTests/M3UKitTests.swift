@@ -142,6 +142,35 @@ func parseIPTVExtendedFormat() throws {
     #expect(item.directives[1].attributes["http-user-agent"] == "IPTVPro")
 }
 
+@Test("Use enum keys for IPTV metadata access")
+func typedIPTVMetadataAccess() throws {
+    let parser = M3UParser()
+    let text = """
+    #EXTM3U x-tvg-url=https://epg.example.com/guide.xml
+    #EXTINF:-1 tvg-id=cctv1 tvg-name="CCTV 1" tvg-logo=https://img.example.com/cctv1.png group-title=News,CCTV-1
+    #KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+    http://example.com/cctv1.m3u8
+    """
+
+    var playlist = try parser.parse(text)
+    var item = try #require(playlist.items.first)
+
+    #expect(playlist[iptv: .xTvgURL] == "https://epg.example.com/guide.xml")
+    #expect(playlist.epgURL == "https://epg.example.com/guide.xml")
+
+    #expect(item[iptv: .tvgID] == "cctv1")
+    #expect(item.tvgID == "cctv1")
+    #expect(item.tvgName == "CCTV 1")
+    #expect(item.tvgLogo == "https://img.example.com/cctv1.png")
+    #expect(item.groupTitle == "News")
+    #expect(item.directive(named: .kodiprop)?.attributes["inputstream.adaptive.license_type"] == "com.widevine.alpha")
+
+    item[iptv: .groupTitle] = "Documentary"
+    playlist[iptv: .catchup] = "append"
+    #expect(item.attributes["group-title"] == "Documentary")
+    #expect(playlist.headerAttributes["catchup"] == "append")
+}
+
 @Test("Parse UTF-8 BOM and data input")
 func parseDataWithBOM() throws {
     let parser = M3UParser()
