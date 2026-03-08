@@ -1,28 +1,33 @@
 # M3UKit
 
-`M3UKit` is a Swift 6 M3U parser framework distributed as a Swift Package, with support for all Apple platforms.
+[![Swift 6.1+](https://img.shields.io/badge/Swift-6.1%2B-F05138?logo=swift&logoColor=white)](https://www.swift.org)
+[![SPM](https://img.shields.io/badge/SPM-supported-0A84FF)](https://swift.org/package-manager/)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-34C759)](https://developer.apple.com)
+[![DocC](https://img.shields.io/badge/Docs-DocC-5AC8FA)](https://jihongboo.github.io/M3UKit/documentation/m3ukit/)
+[![Pages](https://img.shields.io/github/actions/workflow/status/jihongboo/M3UKit/docc.yml?label=DocC%20Deploy)](https://github.com/jihongboo/M3UKit/actions/workflows/docc.yml)
+
+`M3UKit` is a Swift 6.1+ M3U/M3U8 parser framework distributed as a Swift Package, with support for all Apple platforms.
 
 ## Features
 
-- Swift Package Manager integration
-- Supports iOS / macOS / tvOS / watchOS / visionOS
-- Supports standard M3U and extended M3U (`#EXTM3U` / `#EXTINF`)
-- Supports strict mode (`#EXTM3U` position and extended-tag ordering validation)
-- Parses common `#EXTINF` attributes (for example `tvg-id`, `group-title`)
-- Preserves additional directives before each media item (for example `#EXTGRP`, `#EXTVLCOPT`)
-- Supports `#EXTENC` parsing
-- Supports key-value extraction for `#EXT-X-*` tags (for example HLS `METHOD/URI/IV`)
-- Supports parsing playlists from text, `Data`, and URL (`http/https` + `file://`)
+- Standard M3U and extended M3U parsing (`#EXTM3U`, `#EXTINF`)
+- Strict validation mode for header order and extended-tag placement
+- `#EXTINF` metadata extraction (duration, title, attributes)
+- Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`)
+- `#EXTENC` support
+- `#EXT-X-*` key-value extraction for HLS tags
+- Input support from `String`, `Data`, and URL (`http/https` + `file://`)
+- Full Apple platform support via Swift Package Manager
 
 ## Installation
 
-Add the dependency to your `Package.swift`:
+Add the dependency in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/your-org/M3UKit.git", from: "0.1.0")
+.package(url: "https://github.com/jihongboo/M3UKit.git", from: "0.1.0")
 ```
 
-Then add the product to your target:
+Then add the product in your target:
 
 ```swift
 .product(name: "M3UKit", package: "M3UKit")
@@ -40,10 +45,10 @@ let playlist = try parser.parse("""
 http://example.com/cctv1.m3u8
 """)
 
-print(playlist.isExtended)              // true
-print(playlist.headerAttributes)        // ["x-tvg-url": "..."]
+print(playlist.isExtended)
+print(playlist.headerAttributes)
+print(playlist.items.first?.title ?? "")
 print(playlist.items.first?.location ?? "")
-print(playlist.items.first?.attributes ?? [:])
 ```
 
 Strict mode:
@@ -52,73 +57,37 @@ Strict mode:
 let strictPlaylist = try parser.parse(sourceText, options: .strict)
 ```
 
-Parse from URL (`http/https` and `file://`):
+Parse from URL:
 
 ```swift
-let playlistFromURL = try await parser.parse(url: URL(string: "https://example.com/live.m3u")!)
+let playlistFromURL = try await parser.parse(
+    url: URL(string: "https://example.com/live.m3u8")!
+)
 ```
 
-## Data Models
+## Documentation
 
-- `M3UPlaylist`: Root playlist model
-  - `isExtended`: Whether the playlist contains an extended header
-  - `headerAttributes`: Attributes parsed from `#EXTM3U`
-  - `extendedEncoding`: Value parsed from `#EXTENC`
-  - `items`: Parsed media items
-- `M3UItem`: Media item
-  - `location`: Media URL or local path
-  - `duration`: Duration from `#EXTINF`
-  - `title`: Title from `#EXTINF`
-  - `attributes`: Parsed key-value attributes from `#EXTINF`
-  - `directives`: Additional directives attached to the item
-- `M3UDirective`: Additional directive model
-  - `attributes`: Parsed key-value pairs (primarily for `#EXT-X-*`)
-  - `isHLS`: Whether the directive is an `#EXT-X-*` tag
+- Online DocC: https://jihongboo.github.io/M3UKit/documentation/m3ukit/
+- DocC source: `Sources/M3UKit/M3UKit.docc`
 
-## Supported Spec Scope
-
-Current implementation focuses on common M3U practices:
-
-1. Normal lines are parsed as media locations.
-2. `#EXTM3U` is parsed as the extended header with optional attributes.
-3. `#EXTINF:<duration> [attrs],<title>` is parsed.
-4. Other `#TAG[:value]` lines are preserved as directives for the following media item.
-5. `#EXTENC:<encoding>` is parsed into `M3UPlaylist.extendedEncoding`.
-6. `#EXT-X-*` tags parse `KEY=VALUE` attributes (including quoted values).
-7. Strict mode requires `#EXTM3U` to be the first meaningful line and requires extended tags to appear after the header.
-
-## DocC
-
-DocC sources are included at:
-
-- `Sources/M3UKit/M3UKit.docc`
-
-Published documentation:
-
-- https://jihongboo.github.io/M3UKit/documentation/m3ukit/
-
-To generate documentation (requires a local DocC-capable toolchain):
+Generate docs locally:
 
 ```bash
 swift package generate-documentation
 ```
 
-## Testing
+## Data Models
 
-Run tests with:
+- `M3UPlaylist`: playlist root object
+- `M3UItem`: playable media entry
+- `M3UDirective`: per-item directive/tag object
+- `M3UParserOptions`: parser behavior options
+- `M3UParserError`: parser error definitions
+
+## Testing
 
 ```bash
 swift test
 ```
 
-Current test coverage includes:
-
-- Plain M3U parsing
-- Extended M3U and attribute extraction
-- Additional directive binding
-- UTF-8 BOM / `Data` input
-- Empty input error handling
-- Strict mode validation
-- `#EXTENC` parsing
-- `#EXT-X-*` attribute parsing
-- URL parsing via local file URL
+Current tests cover plain/extended parsing, directives, strict mode, BOM/data input, URL input, `#EXTENC`, and `#EXT-X-*` attribute parsing.
