@@ -78,11 +78,12 @@ public struct M3UParser: Sendable {
                 if options.strictMode && line.hasPrefix("#EXT") && !playlist.isExtended {
                     throw M3UParserError.missingExtendedHeader(line: lineNumber + 1)
                 }
-                if options.ignoreCommentLines && Self.looksLikeComment(line) {
-                    continue
-                }
                 if let directive = Self.parseDirective(line) {
                     pendingDirectives.append(directive)
+                    continue
+                }
+                if options.ignoreCommentLines && Self.looksLikeComment(line) {
+                    continue
                 }
                 continue
             }
@@ -156,9 +157,7 @@ private extension M3UParser {
         if line == "#" {
             return true
         }
-
-        let knownPrefixes = ["#EXT", "#PLAYLIST"]
-        return !knownPrefixes.contains(where: { line.hasPrefix($0) })
+        return line.hasPrefix("# ")
     }
 
     private static func parseDirective(_ line: String) -> M3UDirective? {
@@ -167,62 +166,47 @@ private extension M3UParser {
         guard let name = pieces.first.map(String.init), !name.isEmpty else {
             return nil
         }
+        guard isLikelyDirectiveName(name) else {
+            return nil
+        }
+        guard isSupportedDirectiveName(name, hasValue: pieces.count == 2) else {
+            return nil
+        }
         let isHLS = name.hasPrefix("EXT-X-")
         if pieces.count == 2 {
             let value = String(pieces[1])
-            let attributes = isHLS ? parseUnquotedOrQuotedAttributes(value) : [:]
+            let attributes = parseUnquotedOrQuotedAttributes(value)
             return M3UDirective(name: name, value: value, attributes: attributes, isHLS: isHLS)
         }
         return M3UDirective(name: name, attributes: [:], isHLS: isHLS)
     }
 
     private static func parseEXTINF(_ payload: String) -> (duration: Double?, title: String?, attributes: [String: String]) {
-        let components = payload.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
-        let infoPart = components.first.map(String.init) ?? ""
-        let title = components.count > 1 ? String(components[1]).trimmingCharacters(in: .whitespaces) : nil
+        let (infoPart, titlePart) = splitOnceOutsideQuotes(payload, separator: ",")
+        let title = titlePart?.trimmingCharacters(in: .whitespaces)
 
         let trimmedInfo = infoPart.trimmingCharacters(in: .whitespaces)
         let tokens = trimmedInfo.split(omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
 
-        let duration: Double?
+        let durationToken = tokens.first.map(String.init)
+        let duration = durationToken.flatMap(Double.init)
+
         if let first = tokens.first {
-            duration = Double(first)
+            let firstToken = String(first)
+            if duration != nil, trimmedInfo.hasPrefix(firstToken) {
+                let start = trimmedInfo.index(trimmedInfo.startIndex, offsetBy: firstToken.count)
+                let attributesSource = String(trimmedInfo[start...]).trimmingCharacters(in: .whitespaces)
+                return (duration: duration, title: title, attributes: parseAttributes(attributesSource))
+            }
         } else {
-            duration = Double(trimmedInfo)
+            return (duration: nil, title: title, attributes: [:])
         }
 
-        let attributesSource: String
-        if let first = tokens.first {
-            attributesSource = String(trimmedInfo.dropFirst(first.count)).trimmingCharacters(in: .whitespaces)
-        } else {
-            attributesSource = ""
-        }
-
-        let attributes = parseAttributes(attributesSource)
-        return (duration: duration, title: title, attributes: attributes)
+        return (duration: nil, title: title, attributes: parseAttributes(trimmedInfo))
     }
 
     private static func parseAttributes(_ source: String) -> [String: String] {
-        let pattern = #"([A-Za-z0-9_-]+)=\"([^\"]*)\""#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return [:]
-        }
-
-        let nsSource = source as NSString
-        let range = NSRange(location: 0, length: nsSource.length)
-        let matches = regex.matches(in: source, options: [], range: range)
-
-        var result: [String: String] = [:]
-        for match in matches where match.numberOfRanges >= 3 {
-            let key = nsSource.substring(with: match.range(at: 1))
-            let value = nsSource.substring(with: match.range(at: 2))
-            result[key] = value
-        }
-        return result
-    }
-
-    private static func parseUnquotedOrQuotedAttributes(_ source: String) -> [String: String] {
-        let pattern = #"([A-Za-z0-9_-]+)=(\"([^\"]*)\"|[^,]*)"#
+        let pattern = #"([A-Za-z0-9._-]+)=(\"([^\"]*)\"|[^\s,]+)"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return [:]
         }
@@ -245,4 +229,72 @@ private extension M3UParser {
         }
         return result
     }
+
+    private static func parseUnquotedOrQuotedAttributes(_ source: String) -> [String: String] {
+        let pattern = #"([A-Za-z0-9._-]+)=(\"([^\"]*)\"|[^,]*)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [:]
+        }
+
+        let nsSource = source as NSString
+        let range = NSRange(location: 0, length: nsSource.length)
+        let matches = regex.matches(in: source, options: [], range: range)
+
+        var result: [String: String] = [:]
+        for match in matches where match.numberOfRanges >= 3 {
+            let key = nsSource.substring(with: match.range(at: 1))
+            let fullValue = nsSource.substring(with: match.range(at: 2))
+            let normalizedValue: String
+            if fullValue.hasPrefix("\""), fullValue.hasSuffix("\""), fullValue.count >= 2 {
+                normalizedValue = String(fullValue.dropFirst().dropLast())
+            } else {
+                normalizedValue = fullValue
+            }
+            result[key] = normalizedValue
+        }
+        return result
+    }
+
+    private static func splitOnceOutsideQuotes(_ source: String, separator: Character) -> (String, String?) {
+        var inQuotes = false
+        for index in source.indices {
+            let character = source[index]
+            if character == "\"" {
+                inQuotes.toggle()
+                continue
+            }
+            if character == separator, !inQuotes {
+                let before = String(source[..<index])
+                let afterIndex = source.index(after: index)
+                let after = afterIndex < source.endIndex ? String(source[afterIndex...]) : ""
+                return (before, after)
+            }
+        }
+        return (source, nil)
+    }
+
+    private static func isLikelyDirectiveName(_ name: String) -> Bool {
+        guard !name.isEmpty else {
+            return false
+        }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        guard name.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
+            return false
+        }
+        return name == name.uppercased()
+    }
+
+    private static func isSupportedDirectiveName(_ name: String, hasValue: Bool) -> Bool {
+        if name.hasPrefix("EXT") || name == "PLAYLIST" {
+            return true
+        }
+        if hasValue, knownNonExtendedDirectiveNames.contains(name) {
+            return true
+        }
+        return false
+    }
+
+    private static let knownNonExtendedDirectiveNames: Set<String> = [
+        "KODIPROP"
+    ]
 }

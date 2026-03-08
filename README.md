@@ -12,10 +12,11 @@
 
 - Standard M3U and extended M3U parsing (`#EXTM3U`, `#EXTINF`)
 - Strict validation mode for header order and extended-tag placement
-- `#EXTINF` metadata extraction (duration, title, attributes)
-- Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`)
+- IPTV-style `#EXTINF` parsing (supports optional duration and quoted/unquoted attributes)
+- Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`, `#KODIPROP`)
 - `#EXTENC` support
 - `#EXT-X-*` key-value extraction for HLS tags
+- Enum-based IPTV key access (`playlist[iptv:]`, `item[iptv:]`) to avoid raw string keys
 - Input support from `String`, `Data`, and URL (`http/https` + `file://`)
 - Full Apple platform support via Swift Package Manager
 
@@ -65,6 +66,18 @@ let playlistFromURL = try await parser.parse(
 )
 ```
 
+Typed IPTV access (no hard-coded string keys):
+
+```swift
+let playlist = try parser.parse(source)
+let item = playlist.items[0]
+
+print(playlist[iptv: .xTvgURL] ?? "")
+print(item[iptv: .tvgID] ?? "")
+print(item.groupTitle ?? "")
+print(item.directive(named: .extvlcopt)?.attributes["http-user-agent"] ?? "")
+```
+
 ## Documentation
 
 - Online DocC: https://jihongboo.github.io/M3UKit/documentation/m3ukit/
@@ -90,4 +103,4 @@ swift package generate-documentation
 swift test
 ```
 
-Current tests cover plain/extended parsing, directives, strict mode, BOM/data input, URL input, `#EXTENC`, and `#EXT-X-*` attribute parsing.
+Current tests cover plain/extended parsing, IPTV extensions, directives, strict mode, BOM/data input, URL input, `#EXTENC`, and `#EXT-X-*` attribute parsing.

@@ -59,7 +59,7 @@ func parseDirectives() throws {
     let directives = playlist.items[0].directives
     #expect(directives.count == 2)
     #expect(directives[0] == M3UDirective(name: "EXTGRP", value: "Music"))
-    #expect(directives[1] == M3UDirective(name: "EXTVLCOPT", value: "http-user-agent=MyAgent"))
+    #expect(directives[1] == M3UDirective(name: "EXTVLCOPT", value: "http-user-agent=MyAgent", attributes: ["http-user-agent": "MyAgent"]))
 }
 
 @Test("Ignore non-standard comment lines by default")
@@ -77,6 +77,26 @@ func ignoreCommentLines() throws {
 
     #expect(playlist.items.count == 1)
     #expect(playlist.items[0].directives.isEmpty)
+}
+
+@Test("Ignore uppercase free-form comments but keep known IPTV directives")
+func ignoreUppercaseFreeFormComments() throws {
+    let parser = M3UParser()
+    let text = """
+    #EXTM3U
+    #EXTINF:-1,Sample
+    #NOTE
+    #TODO:manual check
+    #KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+    https://example.com/a.m3u8
+    """
+
+    let playlist = try parser.parse(text)
+    let item = try #require(playlist.items.first)
+
+    #expect(item.directives.count == 1)
+    #expect(item.directives[0].name == "KODIPROP")
+    #expect(item.directives[0].attributes["inputstream.adaptive.license_type"] == "com.widevine.alpha")
 }
 
 @Test("Parse EXTENC in extended playlists")
@@ -112,6 +132,63 @@ func parseHLSAttributes() throws {
     #expect(directive.attributes["METHOD"] == "AES-128")
     #expect(directive.attributes["URI"] == "https://example.com/key.bin")
     #expect(directive.attributes["IV"] == "0x1234")
+}
+
+@Test("Parse IPTV extended tags and unquoted attributes")
+func parseIPTVExtendedFormat() throws {
+    let parser = M3UParser()
+    let text = """
+    #EXTM3U url-tvg=https://epg.example.com/guide.xml catchup=append
+    #EXTINF:tvg-id=cctv1 tvg-name="CCTV 1" group-title=News,China,CCTV-1 HD
+    #KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+    #EXTVLCOPT:http-user-agent=IPTVPro
+    http://example.com/cctv1.m3u8
+    """
+
+    let playlist = try parser.parse(text)
+    let item = try #require(playlist.items.first)
+
+    #expect(playlist.headerAttributes["url-tvg"] == "https://epg.example.com/guide.xml")
+    #expect(playlist.headerAttributes["catchup"] == "append")
+    #expect(item.duration == nil)
+    #expect(item.title == "China,CCTV-1 HD")
+    #expect(item.attributes["tvg-id"] == "cctv1")
+    #expect(item.attributes["tvg-name"] == "CCTV 1")
+    #expect(item.attributes["group-title"] == "News")
+    #expect(item.directives.count == 2)
+    #expect(item.directives[0].name == "KODIPROP")
+    #expect(item.directives[0].attributes["inputstream.adaptive.license_type"] == "com.widevine.alpha")
+    #expect(item.directives[1].name == "EXTVLCOPT")
+    #expect(item.directives[1].attributes["http-user-agent"] == "IPTVPro")
+}
+
+@Test("Use enum keys for IPTV metadata access")
+func typedIPTVMetadataAccess() throws {
+    let parser = M3UParser()
+    let text = """
+    #EXTM3U x-tvg-url=https://epg.example.com/guide.xml
+    #EXTINF:-1 tvg-id=cctv1 tvg-name="CCTV 1" tvg-logo=https://img.example.com/cctv1.png group-title=News,CCTV-1
+    #KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+    http://example.com/cctv1.m3u8
+    """
+
+    var playlist = try parser.parse(text)
+    var item = try #require(playlist.items.first)
+
+    #expect(playlist[iptv: .xTvgURL] == "https://epg.example.com/guide.xml")
+    #expect(playlist.epgURL == "https://epg.example.com/guide.xml")
+
+    #expect(item[iptv: .tvgID] == "cctv1")
+    #expect(item.tvgID == "cctv1")
+    #expect(item.tvgName == "CCTV 1")
+    #expect(item.tvgLogo == "https://img.example.com/cctv1.png")
+    #expect(item.groupTitle == "News")
+    #expect(item.directive(named: .kodiprop)?.attributes["inputstream.adaptive.license_type"] == "com.widevine.alpha")
+
+    item[iptv: .groupTitle] = "Documentary"
+    playlist[iptv: .catchup] = "append"
+    #expect(item.attributes["group-title"] == "Documentary")
+    #expect(playlist.headerAttributes["catchup"] == "append")
 }
 
 @Test("Parse UTF-8 BOM and data input")
