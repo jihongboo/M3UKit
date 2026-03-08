@@ -169,6 +169,9 @@ private extension M3UParser {
         guard isLikelyDirectiveName(name) else {
             return nil
         }
+        guard isSupportedDirectiveName(name, hasValue: pieces.count == 2) else {
+            return nil
+        }
         let isHLS = name.hasPrefix("EXT-X-")
         if pieces.count == 2 {
             let value = String(pieces[1])
@@ -280,4 +283,18 @@ private extension M3UParser {
         }
         return name == name.uppercased()
     }
+
+    private static func isSupportedDirectiveName(_ name: String, hasValue: Bool) -> Bool {
+        if name.hasPrefix("EXT") || name == "PLAYLIST" {
+            return true
+        }
+        if hasValue, knownNonExtendedDirectiveNames.contains(name) {
+            return true
+        }
+        return false
+    }
+
+    private static let knownNonExtendedDirectiveNames: Set<String> = [
+        "KODIPROP"
+    ]
 }

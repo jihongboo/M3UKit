@@ -79,6 +79,26 @@ func ignoreCommentLines() throws {
     #expect(playlist.items[0].directives.isEmpty)
 }
 
+@Test("Ignore uppercase free-form comments but keep known IPTV directives")
+func ignoreUppercaseFreeFormComments() throws {
+    let parser = M3UParser()
+    let text = """
+    #EXTM3U
+    #EXTINF:-1,Sample
+    #NOTE
+    #TODO:manual check
+    #KODIPROP:inputstream.adaptive.license_type=com.widevine.alpha
+    https://example.com/a.m3u8
+    """
+
+    let playlist = try parser.parse(text)
+    let item = try #require(playlist.items.first)
+
+    #expect(item.directives.count == 1)
+    #expect(item.directives[0].name == "KODIPROP")
+    #expect(item.directives[0].attributes["inputstream.adaptive.license_type"] == "com.widevine.alpha")
+}
+
 @Test("Parse EXTENC in extended playlists")
 func parseEXTENC() throws {
     let parser = M3UParser()
