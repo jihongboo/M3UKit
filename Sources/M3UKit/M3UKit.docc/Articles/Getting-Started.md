@@ -41,6 +41,6 @@ let strictPlaylist = try parser.parse(sourceText, options: .strict)
 
 - `#EXTM3U` header and header attributes
 - `#EXTENC` value into ``M3UPlaylist/extendedEncoding``
-- `#EXTINF` duration, title, and quoted attributes
-- Additional directives attached to the following item
+- `#EXTINF` duration, title, and quoted/unquoted attributes (duration can be omitted)
+- Additional directives attached to the following item (including IPTV tags such as `#KODIPROP`)
 - `#EXT-X-*` directives with extracted key-value attributes

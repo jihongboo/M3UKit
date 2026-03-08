@@ -12,8 +12,8 @@
 
 - Standard M3U and extended M3U parsing (`#EXTM3U`, `#EXTINF`)
 - Strict validation mode for header order and extended-tag placement
-- `#EXTINF` metadata extraction (duration, title, attributes)
-- Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`)
+- IPTV-style `#EXTINF` parsing (supports optional duration and quoted/unquoted attributes)
+- Additional directive preservation (for example `#EXTGRP`, `#EXTVLCOPT`, `#KODIPROP`)
 - `#EXTENC` support
 - `#EXT-X-*` key-value extraction for HLS tags
 - Input support from `String`, `Data`, and URL (`http/https` + `file://`)
@@ -90,4 +90,4 @@ swift package generate-documentation
 swift test
 ```
 
-Current tests cover plain/extended parsing, directives, strict mode, BOM/data input, URL input, `#EXTENC`, and `#EXT-X-*` attribute parsing.
+Current tests cover plain/extended parsing, IPTV extensions, directives, strict mode, BOM/data input, URL input, `#EXTENC`, and `#EXT-X-*` attribute parsing.
